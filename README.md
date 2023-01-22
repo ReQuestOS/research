@@ -1,5 +1,5 @@
 # Oculus Quest research
-Version 1.0
+*Version 1.0*
 
 This document is about the inner workings of the Oculus Quest. Most of it should apply for the Quest 2 as well, as they have the same OS (mostly)
 
@@ -18,7 +18,6 @@ Nothing unusual. Currently, no access to a recent ABL binary.
 Some commands, shown [here](https://github.com/QuestEscape/research#commands) seem to not be there anymore. Maybe they have a different name now.
 
 #### RE Notes
-
 ABL status bits `DAT_000848f0` (least to most significant):
 * 0: is unlocked
 * 1: is critical unlocked
@@ -37,6 +36,18 @@ Bootloader behavior:
 
 ## System Software
 Mostly not obfuscated
+
+### Injection Stuff
+`com.facebook.inject`
+
+Widely used dependency
+
+TODO: More writeup
+
+Some Strings:
+* `UL`
+* `ULSEP`
+* `_UL__ULSEP_`
 
 ### System packages
 The system packages can be found in four different places:
@@ -57,6 +68,10 @@ Not to be confused with "Horizon Worlds", Meta's new metaverse. This seems to be
 * User authentication (see [User Authentication](#user-authentication))
 * Gatekeepers (see [Feature Gates](#feature-gates))
 
+Application class `com.oculus.headlesshorizon.HeadlessHorizonApplication`
+
+Made up of about 182 modules. These are annotated with `@InjectorModule`.
+
 #### OSUpdater
 `com.oculus.updater`
 
@@ -71,6 +86,8 @@ The device registers itself on Oculus' servers using a secret certificate stored
 `com.oculus.companion.server`
 
 This service communicates with the Oculus companion (the Oculus app that you install on your phone). It can do a lot of things from enabling/disabling ADB to launching apps. It is registered as device administrator.
+
+See [Companion App](#companion-app)
 
 #### GatekeeperServer
 `com.oculus.gatekeeperservice`
@@ -103,7 +120,7 @@ Propably for work mode.
 #### SystemUX
 `com.oculus.systemux`
 
-Provides system UI components
+Provides system UI components. May be comparable to Android's systemui
 
 #### Oculus Settings
 
@@ -120,7 +137,7 @@ Oculus Settings app. The normal Android settings app is also present.
 #### Oculus Browser
 `com.oculus.browser`
 
-Codename `Carmel`???
+Chromium based browser. Codename `Carmel`???
 
 #### Device Companion Manager
 `com.android.companiondevicemanager`???
@@ -128,14 +145,20 @@ Codename `Carmel`???
 Maybe something with the [Companion App](#companion-app)?
 
 ### OTA Updates
+TODO
 
 ### Framework additions (Oculus Platform)
 Oculus have added quite a few APIs to the Android framework (found in `/system/framework/`). These are mostly wrappers far all the system services mentioned above.
 
-`/system/framework/com.oculus.os.platform.jar`
+Files: 
+* `com.oculus.os.platform.jar`
+* `com.oculus.os.platform-res.apk`
+* `oculus-system-services.jar` ???
+
+You can find all the oculus android permissions in `com.oculus.os.platform.jar` under `oculus.platform.Manifest`.
 
 #### App Quirks
-???
+TODO
 
 ### Device Authentication
 DeviceAuthServer
@@ -144,12 +167,11 @@ DeviceCertService: `/system/vendor/lib64/libdevicecertservice.so`
 
 The first token is fetched from `https://graph.facebook-hardware.com/register`
 
-New tokens can be fetched at `https://graph.facebook-hardware.com/login_request`
+New tokens are fetched from `https://graph.facebook-hardware.com/login_request`
 
 The device certificate is needed for both operations.
 
 Two certificates:
-
 * For locked devices: `/persist/certificates/[ALIAS]/secure.crt`
 * For unlocked devices: `/persist/certificates/[ALIAS]/insecure.crt`
 
@@ -274,6 +296,7 @@ The addresses with [SOMETHING] in them are used for internal testing.
 * POST `/login_checkpoint_verify`
 * POST `/two_factor_verify_code`
 * POST `/device_remote_wipe_completed`
+* ...
 
 ### Possible weak points
 This is a list of weak points, I've come across during my research. These may or may not exist in future versions of the OS.
@@ -281,16 +304,22 @@ This is a list of weak points, I've come across during my research. These may or
 #### Hostname injection
 `GraphQLClient` and other API classes look for the system property `debug.oculus.graphtier` that can be changed through the ADB shell using `setprop`. If it finds a value for the property, it will send all requests to `graph.[GRAPHTIER].oculus.com`. If we cleverly set the property to something like `example.com/` the device will build the base URL `graph.example.com/.oculus.com/` which we would result in a hostname of `graph.example.com`. We can then get a CA signed certificate, for example from Let's encrypt and use it in a program like Burp Suite to do a MITM attack. Now we only need to get around the certificate pinning.
 
-#### Certificate Pinning
+#### Certificate (un)pinning
 `FbCertificatePinnerFactory` checks if the build time is older than one year. By changing the current time, we can trick it into not pinning certificates. However, `FbPinningTrustManager` is actively pinning certificates.
 
 On every request `FbPinningTrustManager` (or one of its extending classes) checks if the calling package is older than one year and if so, it disables pinning. While this would be easy to get around, many free CA signed SSL certificates are only valid for 90 days. This means that you can only set the time 90 days into the future while keeping the certificate valid. This means you have to wait at least 275 days without doing an update until this works.
 
-### Fun facts
-* Using the `settings` CLI app, you can change the display brightness and other settings, inaccessible from the GUI
-
 ## Companion App
 Made with flutter?
+
+## Fun facts
+* Using the `settings` CLI app, you can change the display brightness and other settings, inaccessible from the GUI
+* There seems to be a battery extension, referred to as `Molokini` (found in [Framework additions](#framework-additions-oculus-platform)) There are functions to calculate the total battery level of the internal and external battery as well some other things.
+* The Quest can be in a docked state (at least there is code in [Framework additions](#framework-additions-oculus-platform) for it)
+
+## Random Notes 'n Stuff
+* Mobilelab (test)
+* 
 
 ## Interesting resources
 If you want to read more, have a look at these resources. I used some information from them, so thanks to all of those people.
